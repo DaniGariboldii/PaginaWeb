@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /carrito
+Disallow: /perfil
+Disallow: /mis-pedidos
+Disallow: /direcciones
+
+# Sitemap: https://tu-dominio.com/sitemap.xml

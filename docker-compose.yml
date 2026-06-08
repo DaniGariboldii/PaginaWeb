@@ -1,0 +1,58 @@
+# Stack completo para producción/local: PostgreSQL + Backend + Frontend (nginx)
+# Uso: docker compose up --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ecommerce_db}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?definí JWT_ACCESS_SECRET en .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?definí JWT_REFRESH_SECRET en .env}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:8080}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-strict}
+      TRUST_PROXY: 'true'
+      # Servicios externos (opcionales; sin estos, MP usa modo simulado)
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_SUCCESS_URL: ${MP_SUCCESS_URL:-http://localhost:8080/pago/exitoso}
+      MP_FAILURE_URL: ${MP_FAILURE_URL:-http://localhost:8080/pago/rechazado}
+      MP_PENDING_URL: ${MP_PENDING_URL:-http://localhost:8080/pago/pendiente}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - '4000'
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '8080:80'
+
+volumes:
+  pgdata:
+  uploads:
