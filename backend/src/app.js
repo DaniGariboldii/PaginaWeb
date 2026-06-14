@@ -19,7 +19,10 @@ import addressesRouter from './modules/addresses/addresses.router.js';
 import wishlistRouter from './modules/wishlist/wishlist.router.js';
 import couponsRouter from './modules/coupons/coupons.router.js';
 import shippingRouter from './modules/shipping/shipping.router.js';
+import legalRouter from './modules/legal/legal.router.js';
 import adminRouter from './modules/admin/admin.router.js';
+import seoRouter from './modules/seo/seo.router.js';
+import { setupSpa } from './modules/seo/prerender.js';
 
 const app = express();
 
@@ -40,11 +43,11 @@ app.use(
   })
 );
 
-// Rate limiting global
+// Rate limiting global (más permisivo en desarrollo para no molestar al probar)
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 200,
+    max: env.isDev ? 5000 : 200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Demasiadas peticiones. Intentá más tarde.' },
@@ -66,6 +69,9 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'API operativa', env: env.nodeEnv });
 });
 
+// ─── SEO (sin prefijo /api: se sirven en la raíz) ───────────────────────────────
+app.use('/', seoRouter);
+
 // ─── Rutas ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
 app.use('/api/products', productsRouter);
@@ -77,7 +83,12 @@ app.use('/api/addresses', addressesRouter);
 app.use('/api/wishlist', wishlistRouter);
 app.use('/api/coupons', couponsRouter);
 app.use('/api/shipping', shippingRouter);
+app.use('/api/legal', legalRouter);
 app.use('/api/admin', adminRouter);
+
+// ─── Frontend (SPA) + prerender de meta para bots ───────────────────────────────
+// Solo si existe frontend/dist (build). En desarrollo el frontend corre aparte (Vite).
+setupSpa(app);
 
 // ─── Errores ──────────────────────────────────────────────────────────────────
 app.use(notFound);

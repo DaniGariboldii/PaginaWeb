@@ -17,6 +17,9 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
+  const [lastEmail, setLastEmail] = useState('');
 
   const from = location.state?.from || '/';
 
@@ -28,12 +31,28 @@ export const LoginPage = () => {
 
   const onSubmit = async (data) => {
     setServerError('');
+    setNeedsVerification(false);
+    setResendMsg('');
     try {
       const res = await api.post('/auth/login', data);
       setUser(res.data.data?.user ?? res.data.user);
       navigate(from, { replace: true });
     } catch (err) {
+      if (err.response?.status === 403) {
+        setNeedsVerification(true);
+        setLastEmail(data.email);
+      }
       setServerError(err.response?.data?.message || 'Error al iniciar sesión');
+    }
+  };
+
+  const handleResend = async () => {
+    setResendMsg('');
+    try {
+      await api.post('/auth/resend-verification', { email: lastEmail });
+      setResendMsg('Te reenviamos el email de verificación. Revisá tu casilla (y el spam).');
+    } catch {
+      setResendMsg('No pudimos reenviar el email. Intentá de nuevo en un momento.');
     }
   };
 
@@ -53,6 +72,21 @@ export const LoginPage = () => {
           {serverError && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-5">
               {serverError}
+              {needsVerification && (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  className="block mt-2 font-semibold text-red-800 underline hover:text-red-900"
+                >
+                  Reenviar email de verificación
+                </button>
+              )}
+            </div>
+          )}
+
+          {resendMsg && (
+            <div className="bg-brand-50 border border-brand-200 text-brand-700 text-sm px-4 py-3 rounded-xl mb-5">
+              {resendMsg}
             </div>
           )}
 

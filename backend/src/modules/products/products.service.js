@@ -43,7 +43,7 @@ const SORT_MAP = {
 };
 
 export const listProducts = async (query, isAdmin = false) => {
-  const { page, limit, search, categoryId, brandId, featured, minPrice, maxPrice, inStock, sort } = query;
+  const { page, limit, search, categoryId, brandId, featured, minPrice, maxPrice, inStock, onSale, sort } = query;
 
   const where = {};
 
@@ -60,6 +60,9 @@ export const listProducts = async (query, isAdmin = false) => {
   if (brandId) where.brandId = brandId;
   if (featured === 'true') where.featured = true;
   if (inStock === 'true') where.stock = { gt: 0 };
+  // Productos en oferta. Basta con discountPrice != null porque la escritura garantiza
+  // que el descuento siempre es menor al precio regular (ver create/updateProduct).
+  if (onSale === 'true') where.discountPrice = { not: null };
   if (minPrice !== undefined || maxPrice !== undefined) {
     where.price = {};
     if (minPrice !== undefined) where.price.gte = minPrice;
@@ -103,18 +106,39 @@ export const getProductBySlug = async (slug) => {
   return withRating(product);
 };
 
-/** Productos relacionados: misma categoría, activos, excluyendo el actual */
-export const getRelatedProducts = async (productId, limit = 4) => {
+/**
+ * Productos relacionados: primero los de la misma categoría (activos, con stock);
+ * si no alcanzan para llenar `limit`, se completan con otros destacados/recientes.
+ * Así la sección nunca queda vacía o muy corta aunque la categoría tenga pocos ítems.
+ */
+export const getRelatedProducts = async (productId, limit = 10) => {
   const product = await prisma.product.findUnique({ where: { id: productId }, select: { categoryId: true } });
   if (!product) return [];
 
-  const related = await prisma.product.findMany({
-    where: { categoryId: product.categoryId, active: true, id: { not: productId } },
+  const base = { active: true, stock: { gt: 0 }, id: { not: productId } };
+
+  // 1) Misma categoría
+  const sameCategory = await prisma.product.findMany({
+    where: { ...base, categoryId: product.categoryId },
     take: limit,
     orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
     select: PUBLIC_SELECT,
   });
-  return attachRatings(related);
+
+  // 2) Relleno con otros productos si faltan, sin repetir
+  let result = sameCategory;
+  if (sameCategory.length < limit) {
+    const excludeIds = [productId, ...sameCategory.map((p) => p.id)];
+    const fillers = await prisma.product.findMany({
+      where: { ...base, id: { notIn: excludeIds } },
+      take: limit - sameCategory.length,
+      orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
+      select: PUBLIC_SELECT,
+    });
+    result = [...sameCategory, ...fillers];
+  }
+
+  return attachRatings(result);
 };
 
 export const createProduct = async (data) => {
@@ -142,6 +166,16 @@ export const updateProduct = async (id, data) => {
   const product = await prisma.product.findUnique({ where: { id } });
   if (!product) throw new AppError('Producto no encontrado', 404);
 
+  // El precio de oferta debe quedar siempre por debajo del precio regular, incluso
+  // cuando el update toca solo uno de los dos campos (se compara con el valor vigente).
+  const finalPrice = data.price ?? Number(product.price);
+  const finalDiscount = 'discountPrice' in data
+    ? data.discountPrice
+    : (product.discountPrice != null ? Number(product.discountPrice) : null);
+  if (finalDiscount != null && finalDiscount >= finalPrice) {
+    throw new AppError('El precio de oferta debe ser menor al precio regular', 400);
+  }
+
   let slug = product.slug;
   if (data.name && data.name !== product.name) {
     slug = await uniqueSlug(data.name, async (s) => {
@@ -158,22 +192,21 @@ export const updateProduct = async (id, data) => {
 };
 
 /**
- * Baja lógica: desactiva el producto en lugar de eliminarlo físicamente.
- * Si no tiene ventas, lo elimina físicamente.
+ * Elimina físicamente el producto. El historial de pedidos se conserva porque
+ * cada OrderItem guarda un snapshot (nombre/precio/cantidad) y su productId queda
+ * en null (onDelete: SetNull). Se limpian las dependencias que no cascadean
+ * (movimientos de stock e ítems de carrito); imágenes, reseñas y favoritos se
+ * borran solos por onDelete: Cascade.
+ * Nota: para ocultar un producto sin borrarlo, usar "Desactivar".
  */
 export const deleteProduct = async (id) => {
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: { _count: { select: { orderItems: true } } },
-  });
+  const product = await prisma.product.findUnique({ where: { id } });
   if (!product) throw new AppError('Producto no encontrado', 404);
 
-  if (product._count.orderItems > 0) {
-    // Tiene ventas → baja lógica
-    await prisma.product.update({ where: { id }, data: { active: false } });
-    return { deleted: false, message: 'Producto desactivado (tiene ventas asociadas)' };
-  }
-
-  await prisma.product.delete({ where: { id } });
+  await prisma.$transaction([
+    prisma.stockMovement.deleteMany({ where: { productId: id } }),
+    prisma.cartItem.deleteMany({ where: { productId: id } }),
+    prisma.product.delete({ where: { id } }),
+  ]);
   return { deleted: true, message: 'Producto eliminado' };
 };

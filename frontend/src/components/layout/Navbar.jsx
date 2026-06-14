@@ -1,14 +1,18 @@
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useState, useRef, useEffect } from 'react';
 import { SearchBar } from '../products/SearchBar';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
+  const location = useLocation();
+  const onSaleActive = location.pathname === '/productos' && location.search.includes('onSale=true');
 
   useEffect(() => {
     const handler = (e) => {
@@ -17,6 +21,9 @@ export const Navbar = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Cerrar el menú mobile al navegar a otra página
+  useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
 
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-ink-200/70 sticky top-0 z-50">
@@ -36,14 +43,27 @@ export const Navbar = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <NavLink
             to="/productos"
+            end
             className={({ isActive }) =>
               `hidden md:block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? 'text-brand-700 bg-brand-50' : 'text-ink-500 hover:text-ink-900 hover:bg-ink-100'
+                isActive && !onSaleActive ? 'text-brand-700 bg-brand-50' : 'text-ink-500 hover:text-ink-900 hover:bg-ink-100'
               }`
             }
           >
             Productos
           </NavLink>
+          <Link
+            to="/productos?onSale=true"
+            className={`hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              onSaleActive ? 'text-rose-700 bg-rose-50' : 'text-rose-600 hover:text-rose-700 hover:bg-rose-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.41.59l7 7a2 2 0 010 2.82l-5 5a2 2 0 01-2.82 0l-7-7A1.99 1.99 0 014 9V4a1 1 0 011-1z" />
+            </svg>
+            Ofertas
+          </Link>
+          <ThemeToggle />
           <Link
             to="/carrito"
             className="relative grid place-items-center w-10 h-10 rounded-xl text-ink-700 hover:bg-ink-100 transition-colors"
@@ -112,8 +132,53 @@ export const Navbar = () => {
               </Link>
             </div>
           )}
+
+          {/* Botón hamburguesa (solo mobile) */}
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            className="md:hidden grid place-items-center w-10 h-10 rounded-xl text-ink-700 hover:bg-ink-100 transition-colors"
+            aria-label="Menú"
+            aria-expanded={mobileOpen}
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              {mobileOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* ── Menú mobile desplegable ──────────────────────────────────────── */}
+      {mobileOpen && (
+        <nav className="md:hidden border-t border-ink-200/70 bg-white px-4 py-3 space-y-1 animate-fade-in-up">
+          <Link
+            to="/productos"
+            className="block px-3 py-2.5 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100"
+          >
+            Productos
+          </Link>
+          <Link
+            to="/productos?onSale=true"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-rose-600 hover:bg-rose-50"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.41.59l7 7a2 2 0 010 2.82l-5 5a2 2 0 01-2.82 0l-7-7A1.99 1.99 0 014 9V4a1 1 0 011-1z" />
+            </svg>
+            Ofertas
+          </Link>
+          {!user && (
+            <Link
+              to="/login"
+              className="block px-3 py-2.5 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100"
+            >
+              Iniciar sesión
+            </Link>
+          )}
+        </nav>
+      )}
     </header>
   );
 };

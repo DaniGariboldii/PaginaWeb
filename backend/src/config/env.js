@@ -46,6 +46,9 @@ export const env = {
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM || 'MiTienda <no-reply@mitienda.com>',
   },
+
+  // Email de la tienda (recibe consultas y solicitudes de arrepentimiento)
+  storeEmail: process.env.STORE_EMAIL || 'hola@mitienda.com',
 };
 
 const required = [
@@ -58,4 +61,13 @@ for (const key of required) {
   if (!process.env[key]) {
     throw new Error(`Variable de entorno requerida no definida: ${key}`);
   }
+}
+
+// En producción, si Mercado Pago está configurado, el secret del webhook es obligatorio.
+// Sin él, cualquiera podría enviar un webhook falso de "pago aprobado" y aprobar pedidos
+// sin cobro real. Fallamos en el arranque para no exponer la tienda con esa brecha.
+if (env.nodeEnv === 'production' && process.env.MP_ACCESS_TOKEN && !process.env.MP_WEBHOOK_SECRET) {
+  throw new Error(
+    'MP_WEBHOOK_SECRET es obligatorio en producción cuando Mercado Pago está configurado (MP_ACCESS_TOKEN presente).'
+  );
 }

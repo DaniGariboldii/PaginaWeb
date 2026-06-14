@@ -39,25 +39,39 @@ enum PaymentStatus {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  firstName    String
-  lastName     String
-  email        String   @unique
-  passwordHash String
-  phone        String?
-  role         Role     @default(CLIENT)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  passwordHash  String
+  phone         String?
+  role          Role     @default(CLIENT)
+  active        Boolean  @default(true)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  cart                Cart?
-  orders              Order[]
-  addresses           Address[]
-  passwordResetTokens PasswordResetToken[]
-  reviews             Review[]
-  wishlist            WishlistItem[]
+  cart                    Cart?
+  orders                  Order[]
+  addresses               Address[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  reviews                 Review[]
+  wishlist                WishlistItem[]
 
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique // SHA-256 del token; el token en crudo solo viaja por email
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
 }
 
 model Review {
@@ -169,10 +183,11 @@ model ProductImage {
 }
 
 model Cart {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  reminderSentAt DateTime? // último email de carrito abandonado enviado
 
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CartItem[]
@@ -198,7 +213,7 @@ model CartItem {
 
 model Address {
   id         String   @id @default(uuid())
-  userId     String
+  userId     String? // null = dirección de un pedido de invitado (no pertenece a una cuenta)
   province   String
   city       String
   postalCode String
@@ -211,7 +226,7 @@ model Address {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   orders Order[]
 
   @@map("addresses")
@@ -219,7 +234,7 @@ model Address {
 
 model Order {
   id            String      @id @default(uuid())
-  userId        String
+  userId        String? // null = compra como invitado (sin cuenta)
   subtotal      Decimal     @default(0) @db.Decimal(10, 2)
   discount      Decimal     @default(0) @db.Decimal(10, 2)
   shippingCost  Decimal     @default(0) @db.Decimal(10, 2)
@@ -228,10 +243,17 @@ model Order {
   status        OrderStatus @default(PENDING_PAYMENT)
   addressId     String
   paymentMethod String      @default("mercadopago")
+  // Datos de contacto del invitado (cuando userId es null)
+  guestEmail    String?
+  guestName     String?
+  guestPhone    String?
+  // Envío
+  trackingNumber String? // número de seguimiento que carga el admin al despachar
+  carrier        String? // transportista (Correo Argentino, Andreani, etc.)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  user    User        @relation(fields: [userId], references: [id])
+  user    User?       @relation(fields: [userId], references: [id])
   address Address     @relation(fields: [addressId], references: [id])
   items   OrderItem[]
   payment Payment?
@@ -290,15 +312,19 @@ model OrderItem {
 }
 
 model Payment {
-  id                String        @id @default(uuid())
-  orderId           String        @unique
-  provider          String        @default("mercadopago")
-  providerPaymentId String?       @unique
-  status            PaymentStatus @default(PENDING)
-  amount            Decimal       @db.Decimal(10, 2)
-  rawResponse       Json?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                   String        @id @default(uuid())
+  orderId              String        @unique
+  provider             String        @default("mercadopago")
+  // ID de la preferencia (Checkout Pro). Se reescribe en cada reintento de checkout,
+  // por eso NO es único. Identifica el intento de pago, no el pago concretado.
+  providerPreferenceId String?
+  // ID del pago concretado en Mercado Pago. Único y global: identifica la transacción real.
+  providerPaymentId    String?       @unique
+  status               PaymentStatus @default(PENDING)
+  amount               Decimal       @db.Decimal(10, 2)
+  rawResponse          Json?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
 

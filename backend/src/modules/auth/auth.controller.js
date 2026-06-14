@@ -6,6 +6,8 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
   changePasswordSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 } from '../../validators/auth.validator.js';
 import { sendSuccess } from '../../utils/response.js';
 import { accessCookieOptions, refreshCookieOptions } from '../../utils/tokens.js';
@@ -23,9 +25,30 @@ const clearTokenCookies = (res) => {
 export const registerController = async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
-    const { user, accessToken, refreshToken } = await authService.register(data);
-    setTokenCookies(res, accessToken, refreshToken);
-    sendSuccess(res, { user }, 'Cuenta creada correctamente', 201);
+    const { user } = await authService.register(data);
+    // No inicia sesión: debe verificar el email primero
+    sendSuccess(res, { user, requiresVerification: true }, 'Cuenta creada. Te enviamos un email para verificar tu cuenta.', 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyEmailController = async (req, res, next) => {
+  try {
+    const { token } = verifyEmailSchema.parse(req.body);
+    const { user, accessToken, refreshToken } = await authService.verifyEmail(token);
+    setTokenCookies(res, accessToken, refreshToken); // queda logueado tras verificar
+    sendSuccess(res, { user }, 'Email verificado. ¡Bienvenido!');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resendVerificationController = async (req, res, next) => {
+  try {
+    const { email } = resendVerificationSchema.parse(req.body);
+    await authService.resendVerification(email);
+    sendSuccess(res, null, 'Si tu cuenta no estaba verificada, te reenviamos el email.');
   } catch (err) {
     next(err);
   }

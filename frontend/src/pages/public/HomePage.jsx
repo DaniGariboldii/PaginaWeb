@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useFetch } from '../../hooks/useFetch';
 import { productsService, categoriesService } from '../../services/products.service';
 import { ProductCard } from '../../components/products/ProductCard';
-import { PageSpinner } from '../../components/ui/Spinner';
+import { ProductCarousel } from '../../components/products/ProductCarousel';
+import { PageSpinner, Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
 import { Seo } from '../../components/ui/Seo';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +23,37 @@ export const HomePage = () => {
 
   const featured = featuredData?.products || [];
   const categories = catData?.categories || [];
+
+  // Categoría seleccionada para el carrusel (la primera por defecto)
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [catProducts, setCatProducts] = useState([]);
+  const [loadingCatProducts, setLoadingCatProducts] = useState(false);
+
+  // Al cargar las categorías, seleccionamos la primera
+  useEffect(() => {
+    if (!selectedCat && categories.length > 0) setSelectedCat(categories[0].id);
+  }, [categories, selectedCat]);
+
+  // Traer los productos de la categoría seleccionada
+  useEffect(() => {
+    if (!selectedCat) return;
+    let active = true;
+    setLoadingCatProducts(true);
+    productsService
+      .list({ categoryId: selectedCat, limit: 12, inStock: 'true' })
+      .then((res) => {
+        if (active) setCatProducts(res.data.data?.products || []);
+      })
+      .catch(() => {
+        if (active) setCatProducts([]);
+      })
+      .finally(() => {
+        if (active) setLoadingCatProducts(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedCat]);
 
   return (
     <div>
@@ -88,39 +121,8 @@ export const HomePage = () => {
         </div>
       </section>
 
-      {/* ── Categorías ────────────────────────────────────────────────── */}
-      {categories.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-ink-900">Explorá por categoría</h2>
-              <p className="text-ink-500 mt-1">Encontrá lo que necesitás más rápido</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                to={`/productos?categoryId=${cat.id}`}
-                className="group bg-white border border-ink-200 rounded-2xl p-6 hover:border-brand-300 hover:shadow-lg hover:shadow-ink-900/5 transition-all"
-              >
-                <span className="grid place-items-center w-12 h-12 rounded-xl bg-brand-50 text-brand-600 mb-4 group-hover:bg-brand-600 group-hover:text-white transition-colors">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d={categoryIcons.default} />
-                  </svg>
-                </span>
-                <p className="font-semibold text-ink-900 group-hover:text-brand-700 transition-colors">{cat.name}</p>
-                {cat.description && (
-                  <p className="text-xs text-ink-500 mt-1 line-clamp-1">{cat.description}</p>
-                )}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ── Destacados ────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-8">
         <div className="flex items-end justify-between mb-8">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold text-ink-900">Productos destacados</h2>
@@ -145,9 +147,83 @@ export const HomePage = () => {
         )}
       </section>
 
+      {/* ── Categorías ────────────────────────────────────────────────── */}
+      {categories.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-ink-900">Explorá por categoría</h2>
+              <p className="text-ink-500 mt-1">Tocá una categoría para ver sus productos</p>
+            </div>
+            {selectedCat && (
+              <Link
+                to={`/productos?categoryId=${selectedCat}`}
+                className="text-brand-600 text-sm font-semibold hover:text-brand-700 flex items-center gap-1 shrink-0"
+              >
+                Ver todos
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            )}
+          </div>
+
+          {/* Selector de categorías */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {categories.map((cat) => {
+              const isActive = selectedCat === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCat(cat.id)}
+                  aria-pressed={isActive}
+                  className={`group text-left rounded-2xl p-6 border transition-all ${
+                    isActive
+                      ? 'bg-brand-600 border-brand-600 shadow-lg shadow-brand-600/20'
+                      : 'bg-white border-ink-200 hover:border-brand-300 hover:shadow-lg hover:shadow-ink-900/5'
+                  }`}
+                >
+                  <span
+                    className={`grid place-items-center w-12 h-12 rounded-xl mb-4 transition-colors ${
+                      isActive ? 'bg-white/15 text-white' : 'bg-brand-50 text-brand-600 group-hover:bg-brand-600 group-hover:text-white'
+                    }`}
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={categoryIcons.default} />
+                    </svg>
+                  </span>
+                  <p className={`font-semibold transition-colors ${isActive ? 'text-white' : 'text-ink-900 group-hover:text-brand-700'}`}>
+                    {cat.name}
+                  </p>
+                  {cat.description && (
+                    <p className={`text-xs mt-1 line-clamp-1 ${isActive ? 'text-white/80' : 'text-ink-500'}`}>
+                      {cat.description}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Carrusel de productos de la categoría seleccionada */}
+          <div className="mt-6">
+            {loadingCatProducts ? (
+              <div className="py-16 grid place-items-center">
+                <Spinner className="h-8 w-8" />
+              </div>
+            ) : catProducts.length === 0 ? (
+              <p className="text-ink-500 text-sm py-8">No hay productos en esta categoría por el momento.</p>
+            ) : (
+              <ProductCarousel products={catProducts} />
+            )}
+          </div>
+        </section>
+      )}
+
       {/* ── CTA (solo para visitantes sin sesión) ─────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-ink-900 to-brand-900 px-8 py-14 md:px-14 text-center">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-ink-900 to-brand-900 dark:from-ink-100 px-8 py-14 md:px-14 text-center">
           <div className="absolute -top-16 -right-16 w-64 h-64 bg-brand-500/20 rounded-full blur-3xl" />
           <div className="relative">
             {user ? (

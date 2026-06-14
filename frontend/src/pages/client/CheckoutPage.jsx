@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,7 +9,11 @@ import { PageSpinner } from '../../components/ui/Spinner';
 import { ErrorMessage } from '../../components/ui/ErrorMessage';
 import { Button } from '../../components/ui/Button';
 import { AddressFormFields } from './AddressesPage';
+import { GuestCheckoutPage } from './GuestCheckoutPage';
+import { TrustBadges } from '../../components/ui/TrustBadges';
 import { formatPrice } from '../../utils/format';
+import { trackBeginCheckout } from '../../lib/analytics';
+import { useAuth } from '../../context/AuthContext';
 
 const addrSchema = z.object({
   province: z.string().min(2, 'Requerido'),
@@ -23,7 +27,13 @@ const addrSchema = z.object({
   isDefault: z.boolean().default(false),
 });
 
+// Punto de entrada de /checkout: el invitado usa el flujo sin cuenta.
 export const CheckoutPage = () => {
+  const { user } = useAuth();
+  return user ? <RegisteredCheckout /> : <GuestCheckoutPage />;
+};
+
+const RegisteredCheckout = () => {
   const { cart, loading: cartLoading, refresh } = useCart();
   const navigate = useNavigate();
 
@@ -63,6 +73,15 @@ export const CheckoutPage = () => {
   };
 
   useEffect(() => { loadAddresses(); }, []);
+
+  // analytics: inicio de checkout (una sola vez, cuando el carrito ya tiene total)
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (!checkoutTracked.current && cart?.total > 0) {
+      checkoutTracked.current = true;
+      trackBeginCheckout(cart.total);
+    }
+  }, [cart?.total]);
 
   // Cotizar envío cuando cambia la dirección seleccionada o el total del carrito
   useEffect(() => {
@@ -278,19 +297,22 @@ export const CheckoutPage = () => {
                 </div>
               ) : (
                 <>
+                  <label className="block text-sm font-medium text-ink-700 mb-1.5">¿Tenés un cupón?</label>
                   <div className="flex gap-2">
                     <input
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
                       placeholder="Código de descuento"
-                      className="flex-1 border border-ink-200 rounded-xl px-3 py-2 text-sm uppercase placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      className="flex-1 min-w-0 border border-ink-200 rounded-xl px-3.5 py-2.5 text-sm uppercase placeholder:normal-case placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
                     />
                     <button
+                      type="button"
                       onClick={applyCoupon}
-                      disabled={applyingCoupon}
-                      className="px-4 py-2 bg-ink-900 text-white rounded-xl text-sm font-medium hover:bg-ink-700 disabled:opacity-50"
+                      disabled={applyingCoupon || !couponInput.trim()}
+                      className="shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border border-ink-200 text-ink-700 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                     >
-                      Aplicar
+                      {applyingCoupon ? '...' : 'Aplicar'}
                     </button>
                   </div>
                   {couponError && <p className="text-red-500 text-xs mt-1.5">{couponError}</p>}
@@ -334,6 +356,9 @@ export const CheckoutPage = () => {
             <Link to="/carrito" className="block text-center text-sm text-ink-500 hover:text-ink-700 mt-4">
               Volver al carrito
             </Link>
+
+            {/* Señales de confianza: reducen el abandono justo antes de pagar */}
+            <TrustBadges layout="list" className="border-t border-ink-100 mt-5 pt-5" />
           </div>
         </div>
       </div>

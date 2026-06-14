@@ -13,7 +13,7 @@ const ICONS = {
 const STYLES = {
   success: 'bg-emerald-600',
   error: 'bg-red-600',
-  info: 'bg-ink-900',
+  info: 'bg-ink-900 dark:bg-ink-100',
 };
 
 export const ToastProvider = ({ children }) => {

@@ -1,5 +1,5 @@
 import * as orderService from './orders.service.js';
-import { createOrderSchema, updateOrderStatusSchema, orderQuerySchema } from '../../validators/order.validator.js';
+import { createOrderSchema, guestOrderSchema, updateOrderStatusSchema, orderQuerySchema } from '../../validators/order.validator.js';
 import { sendSuccess } from '../../utils/response.js';
 
 export const createOrder = async (req, res, next) => {
@@ -7,6 +7,24 @@ export const createOrder = async (req, res, next) => {
     const { addressId, couponCode } = createOrderSchema.parse(req.body);
     const order = await orderService.createOrderFromCart(req.user.id, addressId, couponCode);
     sendSuccess(res, { order }, 'Pedido creado', 201);
+  } catch (err) { next(err); }
+};
+
+// ─── Invitado (sin cuenta) ────────────────────────────────────────────────────
+
+export const createGuestOrder = async (req, res, next) => {
+  try {
+    const data = guestOrderSchema.parse(req.body);
+    const order = await orderService.createGuestOrder(data);
+    sendSuccess(res, { order }, 'Pedido creado', 201);
+  } catch (err) { next(err); }
+};
+
+// Ver un pedido de invitado por su id (el UUID actúa como token; solo pedidos sin cuenta)
+export const getGuestOrder = async (req, res, next) => {
+  try {
+    const order = await orderService.getGuestOrderById(req.params.id);
+    sendSuccess(res, { order });
   } catch (err) { next(err); }
 };
 
@@ -45,8 +63,8 @@ export const listAllOrders = async (req, res, next) => {
 
 export const changeOrderStatus = async (req, res, next) => {
   try {
-    const { status } = updateOrderStatusSchema.parse(req.body);
-    const order = await orderService.updateOrderStatus(req.params.id, status);
+    const { status, trackingNumber, carrier } = updateOrderStatusSchema.parse(req.body);
+    const order = await orderService.updateOrderStatus(req.params.id, status, { trackingNumber, carrier });
     sendSuccess(res, { order }, 'Estado actualizado');
   } catch (err) { next(err); }
 };

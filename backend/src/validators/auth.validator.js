@@ -21,6 +21,14 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Email inválido').toLowerCase(),
 });
 
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token requerido'),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email('Email inválido').toLowerCase(),
+});
+
 const strongPassword = z
   .string()
   .min(8, 'Mínimo 8 caracteres')

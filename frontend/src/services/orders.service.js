@@ -5,9 +5,12 @@ export const ordersService = {
   myOrders: (params) => api.get('/orders/my', { params }),
   getById: (id) => api.get(`/orders/${id}`),
   cancel: (id) => api.post(`/orders/${id}/cancel`),
+  // Invitado (sin cuenta)
+  createGuest: (payload) => api.post('/orders/guest', payload),
+  getGuestById: (id) => api.get(`/orders/guest/${id}`),
   // Admin
   listAll: (params) => api.get('/admin/orders', { params }),
-  updateStatus: (id, status) => api.put(`/admin/orders/${id}/status`, { status }),
+  updateStatus: (id, status, extra = {}) => api.put(`/admin/orders/${id}/status`, { status, ...extra }),
 };
 
 export const couponsService = {
@@ -39,4 +42,10 @@ export const paymentsService = {
   createPreference: (orderId) => api.post('/payments/create-preference', { orderId }),
   simulate: (orderId, outcome = 'approved') => api.post('/payments/simulate', { orderId, outcome }),
   status: (orderId) => api.get(`/payments/${orderId}/status`),
+  mode: () => api.get('/payments/mode'),
+  confirm: (orderId, paymentId) => api.post('/payments/confirm', { orderId, paymentId }),
+  // Invitado (públicos)
+  createGuestPreference: (orderId) => api.post('/payments/guest/create-preference', { orderId }),
+  guestSimulate: (orderId, outcome = 'approved') => api.post('/payments/guest/simulate', { orderId, outcome }),
+  guestConfirm: (orderId, paymentId) => api.post('/payments/guest/confirm', { orderId, paymentId }),
 };

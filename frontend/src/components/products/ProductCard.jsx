@@ -6,6 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 const formatPrice = (price) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(price);
 
+// Umbral de "últimas unidades" (coincide con LOW_STOCK_THRESHOLD del backend)
+const LOW_STOCK_THRESHOLD = 5;
+
 export const ProductCard = ({ product }) => {
   const { user } = useAuth();
   const { isWishlisted, toggle } = useWishlist();
@@ -56,6 +59,11 @@ export const ProductCard = ({ product }) => {
           {hasDiscount && (
             <span className="bg-emerald-500 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-sm">
               −{discountPct}%
+            </span>
+          )}
+          {product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD && (
+            <span className="bg-rose-500 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-sm">
+              ¡Últimas {product.stock}!
             </span>
           )}
         </div>

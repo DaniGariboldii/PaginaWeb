@@ -3,6 +3,7 @@ import app from './app.js';
 import { env } from './config/env.js';
 import prisma from './config/prisma.js';
 import { releaseExpiredOrders } from './modules/orders/orders.service.js';
+import { sendAbandonedCartReminders } from './modules/cart/abandonedCart.service.js';
 
 // Cada 5 minutos libera el stock de pedidos pendientes de pago vencidos (reserva abandonada).
 const RESERVATION_TTL_MINUTES = 30;
@@ -12,6 +13,16 @@ const startReservationCleanup = () => {
   );
   run(); // una pasada al arrancar
   setInterval(run, 5 * 60 * 1000);
+};
+
+// Cada 30 minutos envía recordatorios de carrito abandonado (carritos con ítems
+// inactivos por más de ABANDONED_CART_HOURS horas).
+const ABANDONED_CART_HOURS = Number(process.env.ABANDONED_CART_HOURS) || 4;
+const startAbandonedCartReminders = () => {
+  const run = () => sendAbandonedCartReminders(ABANDONED_CART_HOURS).catch((e) =>
+    console.error('[CART] Error enviando recordatorios:', e.message)
+  );
+  setInterval(run, 30 * 60 * 1000);
 };
 
 const start = async () => {
@@ -24,6 +35,7 @@ const start = async () => {
     });
 
     startReservationCleanup();
+    startAbandonedCartReminders();
   } catch (err) {
     console.error('[SERVER] Error al iniciar:', err);
     await prisma.$disconnect();

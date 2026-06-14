@@ -22,7 +22,18 @@ async function main() {
   console.log('🌱  Iniciando seed...');
 
   // ── Admin ─────────────────────────────────────────────────────────────────
-  const adminEmail = 'admin@mitienda.com';
+  // Las credenciales se toman de variables de entorno. En producción son obligatorias
+  // (no se crea un admin con contraseña conocida); en desarrollo hay un fallback cómodo.
+  const isProd = process.env.NODE_ENV === 'production';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@mitienda.com';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || (isProd ? null : 'Admin1234');
+
+  if (!adminPassword) {
+    throw new Error(
+      'En producción definí SEED_ADMIN_EMAIL y SEED_ADMIN_PASSWORD antes de correr el seed (no se crea un admin con contraseña por defecto).'
+    );
+  }
+
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
 
   if (!existing) {
@@ -31,8 +42,9 @@ async function main() {
         firstName: 'Admin',
         lastName: 'Principal',
         email: adminEmail,
-        passwordHash: await bcrypt.hash('Admin1234', 12),
+        passwordHash: await bcrypt.hash(adminPassword, 12),
         role: 'ADMIN',
+        emailVerified: true,
         cart: { create: {} },
       },
     });
@@ -124,7 +136,11 @@ async function main() {
   }
 
   console.log('\n🎉  Seed completado.');
-  console.log('   Admin → admin@mitienda.com / Admin1234');
+  console.log('   Admin →', adminEmail);
+  if (!process.env.SEED_ADMIN_PASSWORD && !isProd) {
+    console.log('   Contraseña de desarrollo por defecto: Admin1234');
+    console.log('   (en producción definí SEED_ADMIN_PASSWORD; nunca se imprime la contraseña real)');
+  }
 }
 
 main()

@@ -1,9 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 
@@ -25,9 +24,8 @@ const inputClass =
   'w-full border border-ink-200 rounded-xl px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition';
 
 export const RegisterPage = () => {
-  const { setUser } = useAuth();
-  const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   const {
     register,
@@ -39,13 +37,37 @@ export const RegisterPage = () => {
     setServerError('');
     const { confirmPassword, ...payload } = data;
     try {
-      const res = await api.post('/auth/register', payload);
-      setUser(res.data.data?.user ?? res.data.user);
-      navigate('/');
+      await api.post('/auth/register', payload);
+      setRegisteredEmail(payload.email); // mostramos pantalla "verificá tu email"
     } catch (err) {
       setServerError(err.response?.data?.message || 'Error al registrarse');
     }
   };
+
+  // Pantalla de "revisá tu email" tras registrarse
+  if (registeredEmail) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-ink-200 p-8">
+            <span className="grid place-items-center w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 mx-auto mb-4">
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <h1 className="text-2xl font-bold text-ink-900 mb-2">Verificá tu email</h1>
+            <p className="text-ink-500 text-sm">
+              Te enviamos un correo a <strong className="text-ink-700">{registeredEmail}</strong> con un enlace para
+              activar tu cuenta. Revisá tu bandeja de entrada (y la carpeta de spam).
+            </p>
+            <Link to="/login" className="mt-6 inline-block text-brand-600 font-semibold hover:text-brand-700 text-sm">
+              Volver a iniciar sesión
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">

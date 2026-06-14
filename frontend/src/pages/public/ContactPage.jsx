@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Seo } from '../../components/ui/Seo';
+import { legalService } from '../../services/legal.service';
 
 const schema = z.object({
   name: z.string().min(2, 'Ingresá tu nombre'),
@@ -18,11 +19,14 @@ export const ContactPage = () => {
   const toast = useToast();
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
 
-  const onSubmit = async () => {
-    // Demo: no hay endpoint de contacto; simulamos el envío.
-    await new Promise((r) => setTimeout(r, 600));
-    toast.success('¡Mensaje enviado! Te responderemos a la brevedad.');
-    reset();
+  const onSubmit = async (data) => {
+    try {
+      await legalService.contact(data);
+      toast.success('¡Mensaje enviado! Te responderemos a la brevedad.');
+      reset();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo enviar el mensaje');
+    }
   };
 
   return (

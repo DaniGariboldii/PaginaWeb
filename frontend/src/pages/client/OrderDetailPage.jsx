@@ -6,7 +6,7 @@ import { ErrorMessage } from '../../components/ui/ErrorMessage';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { formatPrice, formatDate, orderStatusInfo, paymentStatusInfo } from '../../utils/format';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 
 const CANCELLABLE = ['PENDING_PAYMENT', 'PAID'];
@@ -18,6 +18,12 @@ export const OrderDetailPage = () => {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [simulated, setSimulated] = useState(false);
+
+  // ¿Los pagos están en modo simulado (sin credenciales reales de MP)?
+  useEffect(() => {
+    paymentsService.mode().then(({ data }) => setSimulated(data.data.simulated)).catch(() => {});
+  }, []);
 
   const order = data?.order;
 
@@ -42,6 +48,21 @@ export const OrderDetailPage = () => {
       refetch();
     } catch (err) {
       setPayError(err.response?.data?.message || 'Error en el pago');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  // Modo real: reanudar el pago creando una preferencia y yendo a Mercado Pago
+  const handlePayNow = async () => {
+    setPayError('');
+    setPaying(true);
+    try {
+      const { data } = await paymentsService.createPreference(order.id);
+      if (data.data?.initPoint) window.location.href = data.data.initPoint;
+      else setPayError('No se pudo iniciar el pago');
+    } catch (err) {
+      setPayError(err.response?.data?.message || 'No se pudo iniciar el pago');
     } finally {
       setPaying(false);
     }
@@ -93,8 +114,16 @@ export const OrderDetailPage = () => {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
           <p className="text-sm text-amber-800 font-medium mb-3">Este pedido está pendiente de pago.</p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => handleSimulate('approved')} disabled={paying} size="sm">Simular pago aprobado</Button>
-            <Button onClick={() => handleSimulate('rejected')} disabled={paying} size="sm" variant="danger">Simular rechazo</Button>
+            {simulated ? (
+              <>
+                <Button onClick={() => handleSimulate('approved')} disabled={paying} size="sm">Simular pago aprobado</Button>
+                <Button onClick={() => handleSimulate('rejected')} disabled={paying} size="sm" variant="danger">Simular rechazo</Button>
+              </>
+            ) : (
+              <Button onClick={handlePayNow} disabled={paying} size="sm">
+                {paying ? 'Redirigiendo...' : 'Pagar con Mercado Pago'}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -143,6 +172,12 @@ export const OrderDetailPage = () => {
             <p className="text-sm text-ink-600">{a.street} {a.number}{a.floor && `, Piso ${a.floor}`}{a.apartment && ` Depto ${a.apartment}`}</p>
             <p className="text-sm text-ink-600">{a.city}, {a.province} (CP {a.postalCode})</p>
             {a.reference && <p className="text-xs text-ink-400 mt-1">{a.reference}</p>}
+            {order.trackingNumber && (
+              <div className="mt-3 pt-3 border-t border-ink-100">
+                <p className="text-xs text-ink-500">Seguimiento{order.carrier ? ` · ${order.carrier}` : ''}</p>
+                <p className="text-sm font-semibold text-ink-900">{order.trackingNumber}</p>
+              </div>
+            )}
           </div>
         )}
 

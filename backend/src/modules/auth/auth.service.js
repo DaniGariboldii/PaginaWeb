@@ -8,10 +8,43 @@ import { env } from '../../config/env.js';
 
 const BCRYPT_ROUNDS = 12;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-/** Registra un usuario nuevo y crea su carrito vacío */
+/** Genera y envía el email de verificación para un usuario */
+const sendVerificationEmail = async (user) => {
+  // Invalidar tokens previos
+  await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await prisma.emailVerificationToken.create({
+    data: { userId: user.id, tokenHash: hashToken(rawToken), expiresAt: new Date(Date.now() + VERIFY_TOKEN_TTL_MS) },
+  });
+
+  const url = `${env.frontendUrl}/verificar?token=${rawToken}`;
+  await sendMail({
+    to: user.email,
+    subject: 'Verificá tu email — MiTienda',
+    text: `Hola ${user.firstName}, confirmá tu email entrando a: ${url} (válido por 24 horas).`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#4f46e5">Confirmá tu email</h2>
+        <p>Hola ${user.firstName}, gracias por registrarte en MiTienda. Verificá tu correo para activar tu cuenta.</p>
+        <p style="margin:24px 0">
+          <a href="${url}" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600">
+            Verificar mi email
+          </a>
+        </p>
+        <p style="color:#64748b;font-size:14px">Este enlace vence en 24 horas. Si no te registraste, ignorá este mensaje.</p>
+      </div>`,
+  });
+};
+
+/**
+ * Registra un usuario nuevo (sin verificar) y le envía el email de verificación.
+ * NO inicia sesión: el usuario debe verificar su email antes de poder ingresar.
+ */
 export const register = async ({ firstName, lastName, email, password, phone }) => {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError('El email ya está registrado', 409);
@@ -25,15 +58,17 @@ export const register = async ({ firstName, lastName, email, password, phone }) 
       email,
       passwordHash,
       phone,
+      emailVerified: false,
       cart: { create: {} }, // carrito vacío desde el primer momento
     },
     select: { id: true, firstName: true, lastName: true, email: true, role: true },
   });
 
-  return { user, accessToken: signAccessToken(user.id, user.role), refreshToken: signRefreshToken(user.id) };
+  await sendVerificationEmail(user);
+  return { user };
 };
 
-/** Verifica credenciales y devuelve tokens */
+/** Verifica credenciales y devuelve tokens (requiere email verificado) */
 export const login = async ({ email, password }) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
@@ -44,9 +79,34 @@ export const login = async ({ email, password }) => {
 
   if (!user || !valid) throw new AppError('Email o contraseña incorrectos', 401);
   if (!user.active) throw new AppError('Cuenta desactivada', 403);
+  if (!user.emailVerified) throw new AppError('Verificá tu email antes de iniciar sesión. Revisá tu casilla.', 403);
 
   const safeUser = { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role };
   return { user: safeUser, accessToken: signAccessToken(user.id, user.role), refreshToken: signRefreshToken(user.id) };
+};
+
+/** Verifica el email con el token enviado. Marca verificado e inicia sesión. */
+export const verifyEmail = async (rawToken) => {
+  const record = await prisma.emailVerificationToken.findUnique({ where: { tokenHash: hashToken(rawToken) } });
+  if (!record || record.expiresAt < new Date()) {
+    throw new AppError('El enlace de verificación es inválido o expiró.', 400);
+  }
+
+  const user = await prisma.user.update({
+    where: { id: record.userId },
+    data: { emailVerified: true },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true },
+  });
+  await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
+
+  return { user, accessToken: signAccessToken(user.id, user.role), refreshToken: signRefreshToken(user.id) };
+};
+
+/** Reenvía el email de verificación (silencioso: no revela si el email existe) */
+export const resendVerification = async (email) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.emailVerified) return; // ya verificado o no existe → no hacer nada
+  await sendVerificationEmail(user);
 };
 
 /** Rota el refresh token */

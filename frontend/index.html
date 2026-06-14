@@ -6,8 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Tu tienda online en Argentina. Productos de calidad con envíos a todo el país y pago seguro con Mercado Pago." />
     <meta name="theme-color" content="#4f46e5" />
+    <!-- Baseline Open Graph (lo que leen WhatsApp/Facebook, que no ejecutan JS).
+         Las páginas con JS lo sobrescriben por página vía el componente <Seo>. -->
     <meta property="og:site_name" content="MiTienda" />
     <meta property="og:locale" content="es_AR" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MiTienda — Tu tienda online" />
+    <meta property="og:description" content="Tu tienda online en Argentina. Productos de calidad con envíos a todo el país y pago seguro." />
+    <meta property="og:image" content="/og-default.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MiTienda — Tu tienda online" />
+    <meta name="twitter:description" content="Tu tienda online en Argentina. Productos de calidad con envíos a todo el país y pago seguro." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,6 +24,17 @@
       rel="stylesheet"
     />
     <title>MiTienda — Tu tienda online</title>
+    <script>
+      // Evita el parpadeo: aplica el tema guardado antes de pintar
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

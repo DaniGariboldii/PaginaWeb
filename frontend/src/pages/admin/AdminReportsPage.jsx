@@ -25,7 +25,7 @@ const SalesChart = ({ data }) => {
             className="w-full bg-brand-500 rounded-t-md hover:bg-brand-600 transition-colors min-h-1"
             style={{ height: `${(d.revenue / max) * 100}%` }}
           />
-          <div className="absolute bottom-full mb-1 hidden group-hover:block bg-ink-900 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10">
+          <div className="absolute bottom-full mb-1 hidden group-hover:block bg-ink-900 dark:bg-ink-100 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10">
             {d.day.slice(5)}: {formatPrice(d.revenue)}
           </div>
         </div>

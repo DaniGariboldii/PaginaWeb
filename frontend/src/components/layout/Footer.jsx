@@ -1,7 +1,15 @@
 import { Link } from 'react-router-dom';
+import { TrustBadges } from '../ui/TrustBadges';
 
 export const Footer = () => (
   <footer className="bg-white border-t border-ink-200 mt-auto">
+    {/* Señales de confianza: banda propia integrada al tope del footer */}
+    <div className="bg-ink-50 border-b border-ink-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <TrustBadges />
+      </div>
+    </div>
+
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
         {/* Marca */}
@@ -34,13 +42,13 @@ export const Footer = () => (
           </ul>
         </div>
 
-        {/* Cuenta */}
+        {/* Legales */}
         <div>
-          <h4 className="text-sm font-semibold text-ink-900 mb-3">Cuenta</h4>
+          <h4 className="text-sm font-semibold text-ink-900 mb-3">Legales</h4>
           <ul className="space-y-2 text-sm text-ink-500">
-            <li><Link to="/login" className="hover:text-brand-600">Iniciar sesión</Link></li>
-            <li><Link to="/registro" className="hover:text-brand-600">Registrarse</Link></li>
-            <li><Link to="/perfil" className="hover:text-brand-600">Mi perfil</Link></li>
+            <li><Link to="/terminos" className="hover:text-brand-600">Términos y Condiciones</Link></li>
+            <li><Link to="/privacidad" className="hover:text-brand-600">Política de Privacidad</Link></li>
+            <li><Link to="/arrepentimiento" className="hover:text-brand-600">Botón de Arrepentimiento</Link></li>
           </ul>
         </div>
       </div>

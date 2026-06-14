@@ -21,9 +21,25 @@ export const ProductsPage = () => {
     brandId: searchParams.get('brandId') || '',
     minPrice: searchParams.get('minPrice') || '',
     maxPrice: searchParams.get('maxPrice') || '',
+    onSale: searchParams.get('onSale') === 'true',
     sort: searchParams.get('sort') || 'relevance',
     page: Number(searchParams.get('page') || 1),
   });
+
+  // Sincronizar filtros cuando la URL cambia desde afuera (links del navbar,
+  // tarjetas de categoría, buscador). Como fetchProducts escribe en la URL los
+  // mismos valores que tiene el estado, leerlos de vuelta no genera loop.
+  useEffect(() => {
+    setFilters((prev) => {
+      const urlOnSale = searchParams.get('onSale') === 'true';
+      const urlCategory = searchParams.get('categoryId') || '';
+      const urlSearch = searchParams.get('search') || '';
+      if (prev.onSale === urlOnSale && prev.categoryId === urlCategory && prev.search === urlSearch) {
+        return prev;
+      }
+      return { ...prev, onSale: urlOnSale, categoryId: urlCategory, search: urlSearch, page: 1 };
+    });
+  }, [searchParams]);
 
   // Cargar categorías y marcas una sola vez
   useEffect(() => {
@@ -45,6 +61,7 @@ export const ProductsPage = () => {
       if (filters.brandId) params.brandId = filters.brandId;
       if (filters.minPrice) params.minPrice = filters.minPrice;
       if (filters.maxPrice) params.maxPrice = filters.maxPrice;
+      if (filters.onSale) params.onSale = 'true';
       if (filters.sort && filters.sort !== 'relevance') params.sort = filters.sort;
       params.page = filters.page;
       params.limit = 12;
@@ -72,14 +89,16 @@ export const ProductsPage = () => {
 
   const inputClass =
     'w-full border border-ink-200 rounded-xl px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition';
-  const hasFilters = filters.search || filters.categoryId || filters.brandId || filters.minPrice || filters.maxPrice;
+  const hasFilters = filters.search || filters.categoryId || filters.brandId || filters.minPrice || filters.maxPrice || filters.onSale;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       <Seo title="Productos" description="Explorá todo nuestro catálogo de productos con envíos a todo el país." />
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-ink-900">Productos</h1>
-        <p className="text-ink-500 mt-1">Explorá todo nuestro catálogo</p>
+        <h1 className="text-3xl font-bold text-ink-900">{filters.onSale ? 'Ofertas' : 'Productos'}</h1>
+        <p className="text-ink-500 mt-1">
+          {filters.onSale ? 'Aprovechá todos los productos con descuento' : 'Explorá todo nuestro catálogo'}
+        </p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
@@ -90,7 +109,7 @@ export const ProductsPage = () => {
               <h2 className="font-semibold text-ink-900">Filtros</h2>
               {hasFilters && (
                 <button
-                  onClick={() => setFilters({ search: '', categoryId: '', brandId: '', minPrice: '', maxPrice: '', page: 1 })}
+                  onClick={() => setFilters({ search: '', categoryId: '', brandId: '', minPrice: '', maxPrice: '', onSale: false, sort: 'relevance', page: 1 })}
                   className="text-xs text-brand-600 font-medium hover:text-brand-700"
                 >
                   Limpiar
@@ -143,6 +162,17 @@ export const ProductsPage = () => {
                 <input type="number" placeholder="Máx" value={filters.maxPrice} onChange={(e) => handleFilter('maxPrice', e.target.value)} className={inputClass} />
               </div>
             </div>
+
+            {/* Solo ofertas */}
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filters.onSale}
+                onChange={(e) => handleFilter('onSale', e.target.checked)}
+                className="w-4 h-4 rounded border-ink-200 text-brand-600 focus:ring-brand-500"
+              />
+              <span className="text-sm font-medium text-ink-700">Solo productos en oferta</span>
+            </label>
           </div>
         </aside>
 
